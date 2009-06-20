@@ -66,7 +66,7 @@ class OutboxAction extends MailboxAction
      * retrieve the messages for this user and this page
      *
      * Does a query for the right messages
-     *  
+     *
      * @return Message data object with stream for messages
      *
      * @see MailboxAction::getMessages()

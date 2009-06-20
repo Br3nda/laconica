@@ -45,6 +45,12 @@ class TagAction extends Action
         return true;
     }
 
+    function showSections()
+    {
+        $pop = new PopularNoticeSection($this);
+        $pop->show();
+    }
+
     function title()
     {
         if ($this->page == 1) {
@@ -87,7 +93,7 @@ class TagAction extends Action
                           $this->page, 'tag', array('tag' => $this->tag));
     }
 
-    function isReadOnly()
+    function isReadOnly($args)
     {
         return true;
     }

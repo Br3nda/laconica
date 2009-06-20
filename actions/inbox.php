@@ -46,15 +46,15 @@ require_once INSTALLDIR.'/lib/mailbox.php';
 
 class InboxAction extends MailboxAction
 {
-    
+
     /**
      * Title of the page
      *
      * @return string page title
      */
-    
+
     function title()
-    {        
+    {
         if ($this->page > 1) {
             return sprintf(_("Inbox for %s - page %d"), $this->user->nickname,
                 $this->page);
@@ -67,7 +67,7 @@ class InboxAction extends MailboxAction
      * Retrieve the messages for this user and this page
      *
      * Does a query for the right messages
-     *  
+     *
      * @return Message data object with stream for messages
      *
      * @see MailboxAction::getMessages()
@@ -84,7 +84,7 @@ class InboxAction extends MailboxAction
 
         if ($message->find()) {
             return $message;
-        } else {            
+        } else {
             return null;
         }
     }

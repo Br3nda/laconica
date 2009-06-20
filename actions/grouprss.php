@@ -34,7 +34,7 @@ if (!defined('LACONICA')) {
 
 require_once INSTALLDIR.'/lib/rssaction.php';
 
-define('MEMBERS_PER_SECTION', 81);
+define('MEMBERS_PER_SECTION', 27);
 
 /**
  * Group RSS feed
@@ -57,7 +57,7 @@ class groupRssAction extends Rss10Action
      * @return boolean true
      */
 
-    function isReadOnly()
+    function isReadOnly($args)
     {
         return true;
     }
