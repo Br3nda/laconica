@@ -48,7 +48,7 @@ function checkPrereqs()
 		    $pass = false;
     }
 
-    $reqs = array('gd', 'mysql', 'curl',
+    $reqs = array('gd', 'curl',
                   'xmlwriter', 'mbstring',
                   'gettext');
 
@@ -57,6 +57,10 @@ function checkPrereqs()
             ?><p class="error">Cannot load required extension: <code><?php echo $req; ?></code></p><?php
 		    $pass = false;
         }
+    }
+    if (!checkExtension('mysql') && !checkExtension('pgsql')) {
+	?><p class="error">Cannot find mysql or pgsql extensions &quot;<?= $req ?>&quot;.</p><?
+                    return false;
     }
 
 	if (!is_writable(INSTALLDIR)) {
@@ -280,6 +284,7 @@ function runDbScript($filename, $conn)
 }
 
 ?>
+<<<<<<< HEAD:install.php
 <?php echo"<?"; ?> xml version="1.0" encoding="UTF-8" <?php echo "?>"; ?>
 <!DOCTYPE html
 PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
