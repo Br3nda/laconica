@@ -63,7 +63,7 @@ function checkPrereqs()
                     $pass = false;
     }
 
-	if (!is_writable(INSTALLDIR)) {
+	if (!is_writable(INSTALLDIR) && !is_writable(INSTALLDIR.'/config.php')) {
          ?><p class="error">Cannot write config file to: <code><?php echo INSTALLDIR; ?></code></p>
 	       <p>On your server, try this command: <code>chmod a+w <?php echo INSTALLDIR; ?></code>
          <?php
