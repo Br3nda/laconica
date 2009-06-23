@@ -28,7 +28,7 @@ function checkPrereqs()
 		    return false;
     }
 
-    $reqs = array('gd', 'mysql', 'curl',
+    $reqs = array('gd', 'curl',
                   'xmlwriter', 'mbstring',
                   'gettext');
 
@@ -37,6 +37,10 @@ function checkPrereqs()
             ?><p class="error">Cannot load required extension &quot;<?= $req ?>&quot;.</p><?
 		    return false;
         }
+    }
+    if (!checkExtension('mysql') && !checkExtension('pgsql')) {
+	?><p class="error">Cannot find mysql or pgsql extensions &quot;<?= $req ?>&quot;.</p><?
+                    return false;
     }
 
 	if (!is_writable(INSTALLDIR)) {
