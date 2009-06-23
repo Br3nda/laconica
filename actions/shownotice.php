@@ -106,7 +106,7 @@ class ShownoticeAction extends Action
      * @return boolean true
      */
 
-    function isReadOnly()
+    function isReadOnly($args)
     {
         return true;
     }
@@ -122,7 +122,7 @@ class ShownoticeAction extends Action
 
     function lastModified()
     {
-        return max(strtotime($this->notice->created),
+        return max(strtotime($this->notice->modified),
                    strtotime($this->profile->modified),
                    ($this->avatar) ? strtotime($this->avatar->modified) : 0);
     }

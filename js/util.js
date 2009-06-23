@@ -166,19 +166,52 @@ $(document).ready(function(){
 																		   $("#notice_action-submit").addClass("disabled");
 																		   return true;
 												 						 },
-					   success: function(xml) {	if ($("#error", xml).length > 0 || $("#command_result", xml).length > 0) {
+					   timeout: '60000',
+					   error: function (xhr, textStatus, errorThrown) {	$("#form_notice").removeClass("processing");
+																		$("#notice_action-submit").removeAttr("disabled");
+																		$("#notice_action-submit").removeClass("disabled");
+																		if (textStatus == "timeout") {
+																			alert ("Sorry! We had trouble sending your notice. The servers are overloaded. Please try again, and contact the site administrator if this problem persists");
+																		}
+																		else {
+																			if ($(".error", xhr.responseXML).length > 0) {
+																				$('#form_notice').append(document._importNode($(".error", xhr.responseXML).get(0), true));
+																			}
+																			else {
+																				var HTTP20x30x = [200, 201, 202, 203, 204, 205, 206, 300, 301, 302, 303, 304, 305, 306, 307];
+																				if(jQuery.inArray(parseInt(xhr.status), HTTP20x30x) < 0) {
+																					alert("Sorry! We had trouble sending your notice ("+xhr.status+" "+xhr.statusText+"). Please report the problem to the site administrator if this happens again.");
+																				}
+																				else {
+																					$("#notice_data-text").val("");
+																					counter();
+																				}
+																			}
+																		}
+																	  },
+					   success: function(xml) {	if ($("#error", xml).length > 0) {
 													var result = document._importNode($("p", xml).get(0), true);
 													result = result.textContent || result.innerHTML;
 													alert(result);
 												}
 												else {
-													$("#notices_primary .notices").prepend(document._importNode($("li", xml).get(0), true));
+												    if ($("#command_result", xml).length > 0) {
+													    var result = document._importNode($("p", xml).get(0), true);
+													    result = result.textContent || result.innerHTML;
+													    alert(result);
+                                                    }
+                                                    else {
+                                                         li = $("li", xml).get(0);
+                                                         if ($("#"+li.id).length == 0) {
+                                                              $("#notices_primary .notices").prepend(document._importNode(li, true));
+                                                              $("#notices_primary .notice:first").css({display:"none"});
+                                                              $("#notices_primary .notice:first").fadeIn(2500);
+                                                              NoticeHover();
+                                                              NoticeReply();
+                                                         }
+													}
 													$("#notice_data-text").val("");
-													counter();
-													$("#notices_primary .notice:first").css({display:"none"});
-													$("#notices_primary .notice:first").fadeIn(2500);
-													NoticeHover();
-													NoticeReply();
+                                                    counter();
 												}
 												$("#form_notice").removeClass("processing");
 												$("#notice_action-submit").removeAttr("disabled");
@@ -187,7 +220,6 @@ $(document).ready(function(){
 					   };
 	$("#form_notice").ajaxForm(PostNotice);
 	$("#form_notice").each(addAjaxHidden);
-
     NoticeHover();
     NoticeReply();
 });

@@ -67,6 +67,7 @@ class ApiAction extends Action
                     $this->process_command();
                 } else {
                     # basic authentication failed
+                    common_log(LOG_WARNING, "Failed API auth attempt, nickname: $nickname.");
                     $this->show_basic_auth_error();
                 }
             }
@@ -130,20 +131,21 @@ class ApiAction extends Action
                                  'statuses/friends_timeline',
                                  'statuses/friends',
                                  'statuses/replies',
+                                 'statuses/mentions',
                                  'statuses/followers',
                                  'favorites/favorites');
 
         $fullname = "$this->api_action/$this->api_method";
-        
-        // If the site is "private", all API methods except laconica/config 
+
+        // If the site is "private", all API methods except laconica/config
         // need authentication
         if (common_config('site', 'private')) {
             return $fullname != 'laconica/config' || false;
         }
 
         if (in_array($fullname, $bareauth)) {
-            # bareauth: only needs auth if without an argument
-            if ($this->api_arg) {
+            # bareauth: only needs auth if without an argument or query param specifying user
+            if ($this->api_arg || $this->arg('id') || is_numeric($this->arg('user_id')) || $this->arg('screen_name')) {
                 return false;
             } else {
                 return true;
@@ -180,11 +182,11 @@ class ApiAction extends Action
         }
     }
 
-    function isReadOnly()
+    function isReadOnly($args)
     {
-        # NOTE: before handle(), can't use $this->arg
-        $apiaction = $_REQUEST['apiaction'];
-        $method = $_REQUEST['method'];
+        $apiaction = $args['apiaction'];
+        $method = $args['method'];
+
         list($cmdtext, $fmt) = explode('.', $method);
 
         static $write_methods = array(
@@ -207,5 +209,4 @@ class ApiAction extends Action
 
         return false;
     }
-
 }
