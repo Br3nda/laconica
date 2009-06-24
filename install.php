@@ -334,8 +334,8 @@ function writeConf($sitename, $sqlUrl, $fancy, $dbtype='mysql')
                              "\$config['site']['name'] = \"$sitename\";\n\n".
                              ($fancy ? "\$config['site']['fancy'] = true;\n\n":'').
                              "\$config['db']['database'] = \"$sqlUrl\";\n\n".
-                             "\$config['db']['quote_identifiers'] = true\n\n".
-                             "\$config['db']['type'] = \"$dbtype\"\n\n".
+                             "\$config['db']['quote_identifiers'] = true;\n\n".
+                             "\$config['db']['type'] = \"$dbtype\";\n\n".
                              "?>");
     return $res;
 }
