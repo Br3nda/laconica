@@ -37,7 +37,7 @@ function checkPrereqs()
 {
 	$pass = true;
 
-    if (file_exists(INSTALLDIR.'/config.php')) {
+    if (file_exists(INSTALLDIR.'/config.php' && filesize(INSTALLDIR.'/config.php') > 1)) {
          ?><p class="error">Config file &quot;config.php&quot; already exists.</p>
          <?php
         $pass = false;
@@ -63,7 +63,7 @@ function checkPrereqs()
                     $pass = false;
     }
 
-	if (!is_writable(INSTALLDIR)) {
+	if (!is_writable(INSTALLDIR) && !is_writable(INSTALLDIR.'/config.php')) {
          ?><p class="error">Cannot write config file to: <code><?php echo INSTALLDIR; ?></code></p>
 	       <p>On your server, try this command: <code>chmod a+w <?php echo INSTALLDIR; ?></code>
          <?php
@@ -120,12 +120,14 @@ function showForm()
                 <p class="form_guide" id='fancy-form_guide'>Enable fancy (pretty) URLs. Auto-detection failed, it depends on Javascript.</p>
             </li>
             <li>
-                <label for="host">Hostname</label>
-                <input type="text" id="host" name="host" />
-                <p class="form_guide">Database hostname</p>
+                <label for="dbtype">Type</label>
+                <input type="radio" name="dbtype" id="fancy-mysql" value="enable" checked='checked' /> MySQL<br />
+                <input type="radio" name="dbtype" id="dbtype-pgsql" value="" /> PostgreSQL<br />
+                <p class="form_guide">Database type</p>
             </li>
+
             <li>
-                <label for="host">Database</label>
+                <label for="host">Name</label>
                 <input type="text" id="database" name="database" />
                 <p class="form_guide">Database name</p>
             </li>
