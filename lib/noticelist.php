@@ -179,7 +179,6 @@ class NoticeListItem extends Widget
     {
         $this->showStart();
         $this->showNotice();
-        $this->showNoticeAttachments();
         $this->showNoticeInfo();
         $this->showNoticeOptions();
         $this->showEnd();
@@ -191,18 +190,6 @@ class NoticeListItem extends Widget
         $this->showAuthor();
         $this->showContent();
         $this->out->elementEnd('div');
-    }
-
-    function showNoticeAttachments() {
-        if ($this->isUsedInList()) {
-            return;
-        }
-        $al = new AttachmentList($this->notice, $this->out);
-        $al->show();
-    }
-
-    function isUsedInList() {
-        return 'shownotice' !== $this->out->args['action'];
     }
 
     function showNoticeInfo()
@@ -349,10 +336,6 @@ class NoticeListItem extends Widget
             // versions (>> 0.4.x)
             $this->out->raw(common_render_content($this->notice->content, $this->notice));
         }
-        $uploaded = $this->notice->getUploadedAttachment();
-        if ($uploaded) {
-            $this->out->element('a', array('href' => $uploaded[0], 'class' => 'attachment', 'id' => 'attachment-' . $uploaded[1]), $uploaded[0]);
-        }
         $this->out->elementEnd('p');
     }
 
@@ -449,7 +432,7 @@ class NoticeListItem extends Widget
             $this->out->elementStart('dl', 'response');
             $this->out->element('dt', null, _('To'));
             $this->out->elementStart('dd');
-            $this->out->element('a', array('href' => $convurl),
+            $this->out->element('a', array('href' => $convurl.'#notice-'.$this->notice->id),
                                 _('in context'));
             $this->out->elementEnd('dd');
             $this->out->elementEnd('dl');

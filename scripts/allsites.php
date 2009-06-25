@@ -18,33 +18,23 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+# Abort if called from a web server
+
 define('INSTALLDIR', realpath(dirname(__FILE__) . '/..'));
 
 $helptext = <<<ENDOFHELP
-USAGE: decache.php <table> <id> [<column>]
-Clears the cache for the object in table <table> with id <id>
-If <column> is specified, use that instead of 'id'
+allsites.php - list all sites configured for multi-site use
+
+returns the nickname of each site configured for multi-site use
+
 ENDOFHELP;
 
 require_once INSTALLDIR.'/scripts/commandline.inc';
 
-if (count($args) < 2 || count($args) > 3) {
-    show_help();
+$sn = new Status_network();
+
+if ($sn->find()) {
+    while ($sn->fetch()) {
+        print "$sn->nickname\n";
+    }
 }
-
-$table = $args[0];
-$id = $args[1];
-if (count($args) > 2) {
-    $column = $args[2];
-} else {
-    $column = 'id';
-}
-
-$object = Memcached_DataObject::staticGet($table, $column, $id);
-
-if (!$object) {
-    print "No such '$table' with $column = '$id'.\n";
-    exit(1);
-}
-
-$result = $object->decache();
