@@ -222,6 +222,7 @@ $(document).ready(function(){
 													}
 													$("#notice_data-text").val("");
     												$("#notice_data-attach").val("");
+                                                    $('#notice_data-attach_selected').remove();
                                                     counter();
 												}
 												$("#form_notice").removeClass("processing");
@@ -233,6 +234,7 @@ $(document).ready(function(){
 	$("#form_notice").each(addAjaxHidden);
     NoticeReply();
     NoticeAttachments();
+    NoticeDataAttach();
 });
 
 function NoticeReply() {
@@ -309,4 +311,17 @@ function NoticeAttachments() {
             $(this).closest(".entry-title").removeClass('ov');
         }
     );
+}
+
+function NoticeDataAttach() {
+    NDA = $('#notice_data-attach');
+    NDA.change(function() {
+        S = '<div id="notice_data-attach_selected" class="success"><code>'+$(this).val()+'</code> <button>&#215;</button></div>';
+        NDAS = $('#notice_data-attach_selected');
+        (NDAS.length > 0) ? NDAS.replaceWith(S) : $('#form_notice').append(S);
+        $('#notice_data-attach_selected button').click(function(){
+            $('#notice_data-attach_selected').remove();
+            NDA.val('');
+        });
+    });
 }
