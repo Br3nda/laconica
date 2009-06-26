@@ -269,7 +269,7 @@ function pgsql_db_installer($host, $database, $username, $password, $sitename) {
   else {
     $sqlUrl = "pgsql://$username:$password@$host/$database";
   }
-  $res = writeConf($sitename, $sqlUrl, $fancy);
+  $res = writeConf($sitename, $sqlUrl, $fancy, 'pgsql');
   if (!$res) {
       updateStatus("Can't write config file.", true);
       showForm();
@@ -335,7 +335,7 @@ function writeConf($sitename, $sqlUrl, $fancy, $type='mysql')
                              ($fancy ? "\$config['site']['fancy'] = true;\n\n":'').
                              "\$config['db']['database'] = \"$sqlUrl\";\n\n".
                              ($type == 'pgsql' ? "\$config['db']['quote_identifiers'] = true;\n\n" .
-                             "\$config['db']['dbtype'] = \"$type\";\n\n" : '').
+                             "\$config['db']['type'] = \"$type\";\n\n" : '').
                              "?>");
     return $res;
 }
