@@ -36,8 +36,7 @@ function main()
 function checkPrereqs()
 {
 	$pass = true;
-
-    if (file_exists(INSTALLDIR.'/config.php' && filesize(INSTALLDIR.'/config.php') > 1)) {
+    if (file_exists(INSTALLDIR.'/config.php') && filesize(INSTALLDIR .'/config.php') > 1) {
          ?><p class="error">Config file &quot;config.php&quot; already exists.</p>
          <?php
         $pass = false;
