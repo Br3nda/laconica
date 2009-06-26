@@ -903,7 +903,7 @@ class Notice extends Memcached_DataObject
 
         $qry =
           'SELECT id ' .
-          'FROM '. $user_table .' JOIN subscription '
+          'FROM '. $user_table .' JOIN subscription '.
           'ON '. $user_table .'.id = subscription.subscriber ' .
           'WHERE subscription.subscribed = %d ';
 
