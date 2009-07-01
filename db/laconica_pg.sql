@@ -1,3 +1,4 @@
+    design_id integer comment 'id of a design' references design(id),
 /* local and remote users have profiles */
 
 create sequence profile_seq;
@@ -390,6 +391,8 @@ create table user_group (
     homepage_logo varchar(255) /* comment 'homepage (profile) size logo' */,
     stream_logo varchar(255) /* comment 'stream-sized logo' */,
     mini_logo varchar(255) /* comment 'mini logo' */,
+    design_id integer /*comment 'id of a design' */ references design(id),
+
 
     created timestamp not null default CURRENT_TIMESTAMP /* comment 'date this record was created' */,
     modified timestamp /* comment 'date this record was modified' */
@@ -498,6 +501,26 @@ create table design (
     disposition int default 1 /*comment 'bit 1 = hide background image, bit 2 = display background image, bit 4 = tile background image'*/,
     primary key (id)
 );
+
+create table group_block (
+   group_id integer not null /* comment 'group profile is blocked from' */ references user_group (id),
+   blocked integer not null /* comment 'profile that is blocked' */references profile (id),
+   blocker integer not null /* comment 'user making the block'*/ references "user" (id),
+   modified timestamp /* comment 'date of blocking'*/ ,
+
+   primary key (group_id, blocked)
+);
+
+create table group_alias (
+
+   alias varchar(64) /* comment 'additional nickname for the group'*/ ,
+   group_id integer not null /* comment 'group profile is blocked from'*/ references user_group (id),
+   modified timestamp /* comment 'date alias was created'*/,
+   primary key (alias)
+
+);
+create index group_alias_group_id_idx on group_alias (group_id);
+
 
 /* Textsearch stuff */
 

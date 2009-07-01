@@ -36,8 +36,7 @@ function main()
 function checkPrereqs()
 {
 	$pass = true;
-
-    if (file_exists(INSTALLDIR.'/config.php' && filesize(INSTALLDIR.'/config.php') > 1)) {
+    if (file_exists(INSTALLDIR.'/config.php') && filesize(INSTALLDIR .'/config.php') > 1) {
          ?><p class="error">Config file &quot;config.php&quot; already exists.</p>
          <?php
         $pass = false;
@@ -275,7 +274,7 @@ function pgsql_db_installer($host, $database, $username, $password, $sitename) {
   else {
     $sqlUrl = "pgsql://$username:$password@$host/$database";
   }
-  $res = writeConf($sitename, $sqlUrl, $fancy);
+  $res = writeConf($sitename, $sqlUrl, $fancy, 'pgsql');
   if (!$res) {
       updateStatus("Can't write config file.", true);
       showForm();
@@ -332,7 +331,7 @@ function mysql_db_installer($host, $database, $username, $password, $sitename) {
       }
       updateStatus("Done!");
     }
-function writeConf($sitename, $sqlUrl, $fancy)
+function writeConf($sitename, $sqlUrl, $fancy, $type='mysql')
 {
     $res = file_put_contents(INSTALLDIR.'/config.php',
                              "<?php\n".
@@ -340,6 +339,8 @@ function writeConf($sitename, $sqlUrl, $fancy)
                              "\$config['site']['name'] = \"$sitename\";\n\n".
                              ($fancy ? "\$config['site']['fancy'] = true;\n\n":'').
                              "\$config['db']['database'] = \"$sqlUrl\";\n\n".
+                             ($type == 'pgsql' ? "\$config['db']['quote_identifiers'] = true;\n\n" .
+                             "\$config['db']['type'] = \"$type\";\n\n" : '').
                              "?>");
     return $res;
 }
