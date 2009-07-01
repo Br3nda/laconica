@@ -126,6 +126,30 @@ class User_group extends Memcached_DataObject
         return $members;
     }
 
+    function getAdmins($offset=0, $limit=null)
+    {
+        $qry =
+          'SELECT profile.* ' .
+          'FROM profile JOIN group_member '.
+          'ON profile.id = group_member.profile_id ' .
+          'WHERE group_member.group_id = %d ' .
+          'AND group_member.is_admin = 1 ' .
+          'ORDER BY group_member.modified ASC ';
+
+        if ($limit != null) {
+            if (common_config('db','type') == 'pgsql') {
+                $qry .= ' LIMIT ' . $limit . ' OFFSET ' . $offset;
+            } else {
+                $qry .= ' LIMIT ' . $offset . ', ' . $limit;
+            }
+        }
+
+        $admins = new Profile();
+
+        $admins->query(sprintf($qry, $this->id));
+        return $admins;
+    }
+
     function getBlocked($offset=0, $limit=null)
     {
         $qry =
@@ -251,11 +275,14 @@ class User_group extends Memcached_DataObject
         // XXX: cache this
 
         $user = new User();
+        if(common_config('db','quote_identifiers'))
+            $user_table = '"user"';
+        else $user_table = 'user';
 
         $qry =
           'SELECT id ' .
-          'FROM user JOIN group_member '.
-          'ON user.id = group_member.profile_id ' .
+          'FROM '. $user_table .' JOIN group_member '.
+          'ON '. $user_table .'.id = group_member.profile_id ' .
           'WHERE group_member.group_id = %d ';
 
         $user->query(sprintf($qry, $this->id));

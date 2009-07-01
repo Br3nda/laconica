@@ -796,7 +796,7 @@ class Notice extends Memcached_DataObject
         $notice->selectAdd(); // clears it
         $notice->selectAdd('id');
 
-        $notice->whereAdd('conversation = '.$id);
+        $notice->conversation = $id;
 
         $notice->orderBy('id DESC');
 
@@ -872,10 +872,9 @@ class Notice extends Memcached_DataObject
                 if ($cnt > 0) {
                     $qry .= ', ';
                 }
-                $qry .= '('.$id.', '.$this->id.', '.$source.', "'.$this->created.'") ';
+                $qry .= '('.$id.', '.$this->id.', '.$source.", '".$this->created. "') ";
                 $cnt++;
                 if ($cnt >= MAX_BOXCARS) {
-                    common_debug($qry);
                     $inbox = new Notice_inbox();
                     $inbox->query($qry);
                     $qry = $qryhdr;
@@ -884,7 +883,6 @@ class Notice extends Memcached_DataObject
             }
 
             if ($cnt > 0) {
-                common_debug($qry);
                 $inbox = new Notice_inbox();
                 $inbox->query($qry);
             }
@@ -903,7 +901,7 @@ class Notice extends Memcached_DataObject
 
         $qry =
           'SELECT id ' .
-          'FROM '. $user_table .' JOIN subscription '
+          'FROM '. $user_table .' JOIN subscription '.
           'ON '. $user_table .'.id = subscription.subscriber ' .
           'WHERE subscription.subscribed = %d ';
 

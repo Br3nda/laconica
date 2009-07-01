@@ -36,8 +36,7 @@ function main()
 function checkPrereqs()
 {
 	$pass = true;
-
-    if (file_exists(INSTALLDIR.'/config.php' && filesize(INSTALLDIR.'/config.php') > 1)) {
+    if (file_exists(INSTALLDIR.'/config.php') && filesize(INSTALLDIR .'/config.php') > 1) {
          ?><p class="error">Config file &quot;config.php&quot; already exists.</p>
          <?php
         $pass = false;
@@ -73,6 +72,12 @@ function checkPrereqs()
 	if (!is_writable(INSTALLDIR.'/avatar/')) {
          ?><p class="error">Cannot write avatar directory: <code><?php echo INSTALLDIR; ?>/avatar/</code></p>
 	       <p>On your server, try this command: <code>chmod a+w <?php echo INSTALLDIR; ?>/avatar/</code></p>
+         <?
+	     $pass = false;
+	}
+	if (!is_writable(INSTALLDIR.'/background/')) {
+         ?><p class="error">Cannot write background directory: <code><?php echo INSTALLDIR; ?>/background/</code></p>
+	       <p>On your server, try this command: <code>chmod a+w <?php echo INSTALLDIR; ?>/background/</code></p>
          <?
 	     $pass = false;
 	}
