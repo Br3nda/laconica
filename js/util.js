@@ -49,8 +49,9 @@ $(document).ready(function(){
 		// run once in case there's something in there
 		counter();
 
-		// set the focus
-		$("#notice_data-text").focus();
+        if($('body')[0].id != 'conversation') {
+            $("#notice_data-text").focus();
+        }
 	}
 
 	// XXX: refactor this code
@@ -222,6 +223,7 @@ $(document).ready(function(){
 													}
 													$("#notice_data-text").val("");
     												$("#notice_data-attach").val("");
+    												$("#notice_in-reply-to").val("");
                                                     $('#notice_data-attach_selected').remove();
                                                     counter();
 												}
@@ -281,7 +283,7 @@ function NoticeAttachments() {
         },
         timeout : 0,
         autoHide : true,
-        css : {'max-width':'502px', 'top':'22.5%', 'left':'32.5%'}
+        css : {'max-width':'542px', 'top':'22.5%', 'left':'32.5%'}
     };
 
     $('#content .notice a.attachment').click(function() {

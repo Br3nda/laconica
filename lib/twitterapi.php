@@ -89,7 +89,7 @@ class TwitterapiAction extends Action
 
         $twitter_user['url'] = ($profile->homepage) ? $profile->homepage : null;
         $twitter_user['protected'] = false; # not supported by Laconica yet
-        $twitter_user['followers_count'] = $this->count_subscriptions($profile);
+        $twitter_user['followers_count'] = $profile->subscriberCount();
 
         // To be supported soon...
         $twitter_user['profile_background_color'] = '';
@@ -98,17 +98,11 @@ class TwitterapiAction extends Action
         $twitter_user['profile_sidebar_fill_color'] = '';
         $twitter_user['profile_sidebar_border_color'] = '';
 
-        $subbed = DB_DataObject::factory('subscription');
-        $subbed->subscriber = $profile->id;
-        $subbed_count = (int) $subbed->count() - 1;
-        $twitter_user['friends_count'] = (is_int($subbed_count)) ? $subbed_count : 0;
+        $twitter_user['friends_count'] = $profile->subscriptionCount();
 
         $twitter_user['created_at'] = $this->date_twitter($profile->created);
 
-        $faves = DB_DataObject::factory('fave');
-        $faves->user_id = $user->id;
-        $faves_count = (int) $faves->count();
-        $twitter_user['favourites_count'] = $faves_count; // British spelling!
+        $twitter_user['favourites_count'] = $profile->faveCount(); // British spelling!
 
         // Need to pull up the user for some of this
         $user = User::staticGet($profile->id);
@@ -129,11 +123,7 @@ class TwitterapiAction extends Action
         $twitter_user['profile_background_image_url'] = '';
         $twitter_user['profile_background_tile'] = false;
 
-        $notices = DB_DataObject::factory('notice');
-        $notices->profile_id = $profile->id;
-        $notice_count = (int) $notices->count();
-
-        $twitter_user['statuses_count'] = (is_int($notice_count)) ? $notice_count : 0;
+        $twitter_user['statuses_count'] = $profile->noticeCount();
 
         // Is the requesting user following this user?
         $twitter_user['following'] = false;
@@ -207,7 +197,6 @@ class TwitterapiAction extends Action
 
     function twitter_rss_entry_array($notice)
     {
-
         $profile = $notice->getProfile();
         $entry = array();
 
@@ -223,6 +212,21 @@ class TwitterapiAction extends Action
 
         $entry['updated'] = $entry['published'];
         $entry['author'] = $profile->getBestName();
+
+        # Enclosure
+        $attachments = $notice->attachments();
+        if($attachments){
+            $entry['enclosures']=array();
+            foreach($attachments as $attachment){
+                if ($attachment->isEnclosure()) {
+                    $enclosure=array();
+                    $enclosure['url']=$attachment->url;
+                    $enclosure['mimetype']=$attachment->mimetype;
+                    $enclosure['size']=$attachment->size;
+                    $entry['enclosures'][]=$enclosure;
+                }
+            }
+        }
 
         # RSS Item specific
         $entry['description'] = $entry['content'];
@@ -278,6 +282,67 @@ class TwitterapiAction extends Action
         return $twitter_dm;
     }
 
+    function twitter_relationship_array($source, $target)
+    {
+        $relationship = array();
+
+        $relationship['source'] =
+            $this->relationship_details_array($source, $target);
+        $relationship['target'] =
+            $this->relationship_details_array($target, $source);
+
+        return array('relationship' => $relationship);
+    }
+
+    function relationship_details_array($source, $target)
+    {
+        $details = array();
+
+        $details['screen_name'] = $source->nickname;
+        $details['followed_by'] = $target->isSubscribed($source);
+        $details['following'] = $source->isSubscribed($target);
+
+        $notifications = false;
+
+        if ($source->isSubscribed($target)) {
+
+            $sub = Subscription::pkeyGet(array('subscriber' =>
+                $source->id, 'subscribed' => $target->id));
+
+            if (!empty($sub)) {
+                $notifications = ($sub->jabber || $sub->sms);
+            }
+        }
+
+        $details['notifications_enabled'] = $notifications;
+        $details['blocking'] = $source->hasBlocked($target);
+        $details['id'] = $source->id;
+
+        return $details;
+    }
+
+    function show_twitter_xml_relationship($relationship)
+    {
+        $this->elementStart('relationship');
+
+        foreach($relationship as $element => $value) {
+            if ($element == 'source' || $element == 'target') {
+                $this->elementStart($element);
+                $this->show_xml_relationship_details($value);
+                $this->elementEnd($element);
+            }
+        }
+
+        $this->elementEnd('relationship');
+    }
+
+    function show_xml_relationship_details($details)
+    {
+        foreach($details as $element => $value) {
+            $this->element($element, null, $value);
+        }
+    }
+
     function show_twitter_xml_status($twitter_status)
     {
         $this->elementStart('status');
@@ -317,6 +382,13 @@ class TwitterapiAction extends Action
         $this->element('pubDate', null, $entry['pubDate']);
         $this->element('guid', null, $entry['guid']);
         $this->element('link', null, $entry['link']);
+
+        # RSS only supports 1 enclosure per item
+        if($entry['enclosures']){
+            $enclosure = $entry['enclosures'][0];
+            $this->element('enclosure', array('url'=>$enclosure['url'],'type'=>$enclosure['mimetype'],'length'=>$enclosure['size']), null);
+        }
+
         $this->elementEnd('item');
     }
 
@@ -701,6 +773,34 @@ class TwitterapiAction extends Action
         } else {
             $nickname = common_canonical_nickname($id);
             return User::staticGet('nickname', $nickname);
+        }
+    }
+
+    function get_group($id, $apidata=null)
+    {
+        if (empty($id)) {
+
+            if (is_numeric($this->arg('id'))) {
+                return User_group::staticGet($this->arg('id'));
+            } else if ($this->arg('id')) {
+                $nickname = common_canonical_nickname($this->arg('id'));
+                return User_group::staticGet('nickname', $nickname);
+            } else if ($this->arg('group_id')) {
+                // This is to ensure that a non-numeric user_id still
+                // overrides screen_name even if it doesn't get used
+                if (is_numeric($this->arg('group_id'))) {
+                    return User_group::staticGet('id', $this->arg('group_id'));
+                }
+            } else if ($this->arg('group_name')) {
+                $nickname = common_canonical_nickname($this->arg('group_name'));
+                return User_group::staticGet('nickname', $nickname);
+            }
+
+        } else if (is_numeric($id)) {
+            return User_group::staticGet($id);
+        } else {
+            $nickname = common_canonical_nickname($id);
+            return User_group::staticGet('nickname', $nickname);
         }
     }
 

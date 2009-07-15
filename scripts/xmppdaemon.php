@@ -60,7 +60,9 @@ class XMPPDaemon extends Daemon
             $this->resource = common_config('xmpp', 'resource') . 'daemon';
         }
 
-        $this->log(LOG_INFO, "INITIALIZE XMPPDaemon {$this->user}@{$this->server}/{$this->resource}");
+        $this->jid = $this->user.'@'.$this->server.'/'.$this->resource;
+
+        $this->log(LOG_INFO, "INITIALIZE XMPPDaemon {$this->jid}");
     }
 
     function connect()
@@ -106,8 +108,23 @@ class XMPPDaemon extends Daemon
 
             $this->log(LOG_DEBUG, "Beginning processing loop.");
 
-            $this->conn->process();
+            while ($this->conn->processTime(60)) {
+                $this->sendPing();
+            }
         }
+    }
+
+    function sendPing()
+    {
+        if (!isset($this->pingid)) {
+            $this->pingid = 0;
+        } else {
+            $this->pingid++;
+        }
+
+        $this->log(LOG_DEBUG, "Sending ping #{$this->pingid}");
+
+		$this->conn->send("<iq from='{$this->jid}' to='{$this->server}' id='ping_{$this->pingid}' type='get'><ping xmlns='urn:xmpp:ping'/></iq>");
     }
 
     function handle_reconnect(&$pl)
@@ -116,6 +133,11 @@ class XMPPDaemon extends Daemon
         $this->conn->processUntil('session_start');
         $this->log(LOG_DEBUG, "Sending reconnection presence.");
         $this->conn->presence('Send me a message to post a notice', 'available', null, 'available', 100);
+        unset($pl['xml']);
+        $pl['xml'] = null;
+
+        $pl = null;
+        unset($pl);
     }
 
     function get_user($from)
@@ -189,6 +211,12 @@ class XMPPDaemon extends Daemon
 
         $user->free();
         unset($user);
+
+        unset($pl['xml']);
+        $pl['xml'] = null;
+
+        $pl = null;
+        unset($pl);
     }
 
     function is_self($from)
@@ -334,6 +362,11 @@ class XMPPDaemon extends Daemon
             }
             break;
         }
+        unset($pl['xml']);
+        $pl['xml'] = null;
+
+        $pl = null;
+        unset($pl);
     }
 
     function log($level, $msg)

@@ -248,8 +248,13 @@ class ProfileListItem extends Widget
                 $usf = new UnsubscribeForm($this->out, $this->profile);
                 $usf->show();
             } else {
-                $sf = new SubscribeForm($this->out, $this->profile);
-                $sf->show();
+                // Is it a local user? can't remote sub from a list
+                // XXX: make that possible!
+                $other = User::staticGet('id', $this->profile->id);
+                if (!empty($other)) {
+                    $sf = new SubscribeForm($this->out, $this->profile);
+                    $sf->show();
+                }
             }
             $this->out->elementEnd('li');
         }
