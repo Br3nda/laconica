@@ -356,6 +356,8 @@ class Notice extends Memcached_DataObject
         $this->blowTagCache($blowLast);
         $this->blowGroupCache($blowLast);
         $this->blowConversationCache($blowLast);
+        $profile = Profile::staticGet($this->profile_id);
+        $profile->blowNoticeCount();
     }
 
     function blowConversationCache($blowLast=false)
@@ -1169,6 +1171,20 @@ class Notice extends Memcached_DataObject
         }
         $tag->free();
 
+        # Enclosures
+        $attachments = $this->attachments();
+        if($attachments){
+            foreach($attachments as $attachment){
+                if ($attachment->isEnclosure()) {
+                    $attributes = array('rel'=>'enclosure','href'=>$attachment->url,'type'=>$attachment->mimetype,'length'=>$attachment->size);
+                    if($attachment->title){
+                        $attributes['title']=$attachment->title;
+                    }
+                    $xs->element('link', $attributes, null);
+                }
+            }
+        }
+
         $xs->elementEnd('entry');
 
         return $xs->getString();
@@ -1192,6 +1208,7 @@ class Notice extends Memcached_DataObject
 
         if (empty($cache) ||
             $since_id != 0 || $max_id != 0 || (!is_null($since) && $since > 0) ||
+            is_null($limit) ||
             ($offset + $limit) > NOTICE_CACHE_WINDOW) {
             return call_user_func_array($fn, array_merge($args, array($offset, $limit, $since_id,
                                                                       $max_id, $since)));
@@ -1214,7 +1231,7 @@ class Notice extends Memcached_DataObject
             $window = explode(',', $laststr);
             $last_id = $window[0];
             $new_ids = call_user_func_array($fn, array_merge($args, array(0, NOTICE_CACHE_WINDOW,
-                                                                          $last_id, 0, null, $tag)));
+                                                                          $last_id, 0, null)));
 
             $new_window = array_merge($new_ids, $window);
 
@@ -1229,7 +1246,7 @@ class Notice extends Memcached_DataObject
         }
 
         $window = call_user_func_array($fn, array_merge($args, array(0, NOTICE_CACHE_WINDOW,
-                                                                     0, 0, null, $tag)));
+                                                                     0, 0, null)));
 
         $windowstr = implode(',', $window);
 

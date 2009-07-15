@@ -192,6 +192,24 @@ class Rss10Action extends Action
         }
     }
 
+    // XXX: Surely there should be a common function to do this?
+    function extract_tags ($string)
+    {
+        $count = preg_match_all('/(?:^|\s)#([A-Za-z0-9_\-\.]{1,64})/', strtolower($string), $match);
+        if (!count)
+        {
+            return array();
+        }
+
+        $rv = array();
+        foreach ($match[1] as $tag)
+        {
+            $rv[] = common_canonical_tag($tag);
+        } 
+
+        return array_unique($rv);
+    }
+	 
     function showItem($notice)
     {
         $profile = Profile::staticGet($notice->profile_id);
@@ -214,7 +232,50 @@ class Rss10Action extends Action
         $this->element('cc:licence', array('rdf:resource' => common_config('license', 'url')));
         if ($notice->reply_to) {
             $replyurl = common_local_url('shownotice', array('notice' => $notice->reply_to));
-            $this->element('sioc:reply_to', array('rdf:resource' => $replyurl));
+            $this->element('sioc:reply_of', array('rdf:resource' => $replyurl));
+        }
+        $attachments = $notice->attachments();
+        if($attachments){
+            foreach($attachments as $attachment){
+                if ($attachment->isEnclosure()) {
+                    // DO NOT move xmlns declaration to root element. Making it
+                    // the default namespace here improves compatibility with
+                    // real-world feed readers.
+                    $attribs = array(
+                        'rdf:resource' => $attachment->url,
+                        'url' => $attachment->url,
+                        'xmlns' => 'http://purl.oclc.org/net/rss_2.0/enc#'
+                        );
+                    if ($attachment->title) {
+                        $attribs['dc:title'] = $attachment->title;
+                    }
+                    if ($attachment->modified) {
+                        $attribs['dc:date'] = common_date_w3dtf($attachment->modified);
+                    }
+                    if ($attachment->size) {
+                        $attribs['length'] = $attachment->size;
+                    }
+                    if ($attachment->mimetype) {
+                        $attribs['type'] = $attachment->mimetype;
+                    }
+                    $this->element('enclosure', $attribs);
+                }
+                $this->element('sioc:links_to', array('rdf:resource'=>$attachment->url));
+            }
+        }
+        $tags = $this->extract_tags($notice->content);
+        if (!empty($tags)) {
+            foreach ($tags as $tag)
+            {
+                $tagpage = common_local_url('tag', array('tag' => $tag));
+                $tagrss  = common_local_url('tagrss', array('tag' => $tag));
+                $this->elementStart('ctag:tagged');
+                $this->elementStart('ctag:Tag', array('rdf:about'=>$tagpage.'#concept', 'ctag:label'=>$tag));
+                $this->element('foaf:page', array('rdf:resource'=>$tagpage));
+                $this->element('rdfs:seeAlso', array('rdf:resource'=>$tagrss));
+                $this->elementEnd('ctag:Tag');
+                $this->elementEnd('ctag:tagged');
+            }
         }
         $this->elementEnd('item');
         $this->creators[$creator_uri] = $profile;
@@ -251,6 +312,8 @@ class Rss10Action extends Action
                                               'http://creativecommons.org/ns#',
                                               'xmlns:content' =>
                                               'http://purl.org/rss/1.0/modules/content/',
+                                              'xmlns:ctag' =>
+                                              'http://commontag.org/ns#',
                                               'xmlns:foaf' =>
                                               'http://xmlns.com/foaf/0.1/',
                                               'xmlns:sioc' =>
