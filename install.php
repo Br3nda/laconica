@@ -113,7 +113,7 @@ function checkExtension($name)
 
 function showForm()
 {
-    echo<<<E_O_T
+?>
         </ul>
     </dd>
 </dl>
@@ -148,8 +148,10 @@ function showForm()
             <li>
             
                 <label for="dbtype">Type</label>
-                <input type="radio" name="dbtype" id="fancy-mysql" value="mysql" checked='checked' /> MySQL<br />
-                <input type="radio" name="dbtype" id="dbtype-pgsql" value="pgsql" /> PostgreSQL<br />
+                <?php foreach(db_types_available() as $key => $name): ?>
+                <input type="radio" name="dbtype" id="fancy-dbtype" value="<?php echo $key;?>" checked='checked' /> <?php echo $name;?><br />
+                
+                <?php endforeach;?>
                 <p class="form_guide">Database type</p>
             </li>
 
@@ -173,7 +175,7 @@ function showForm()
     </fieldset>
 </form>
 
-E_O_T;
+<?php
 }
 
 function updateStatus($status, $error=false)
