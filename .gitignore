@@ -5,7 +5,6 @@ file/*
 _darcs/*
 logs/*
 config.php
-.htaccess
 httpd.conf
 *.tmproj
 dataobject.ini
