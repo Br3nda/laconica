@@ -33,6 +33,22 @@ function main()
     }
 }
 
+function db_types() {
+    return array('pgsql' => 'PostgreSQL',
+         'mysql' => 'MySQL', 
+         'sqlite' => 'SQLite');
+}
+
+function db_types_available() {
+    $avail = array();
+    foreach(db_types() as $key=>$name) {
+        if(checkExtension($key)) {
+            $avail[$key] = $name;
+        }
+    }
+    return $avail;
+}
+
 function checkPrereqs()
 {
 	$pass = true;
@@ -58,8 +74,8 @@ function checkPrereqs()
 		    $pass = false;
         }
     }
-    if (!checkExtension('pgsql') && !checkExtension('mysql')) {
-      ?><p class="error">Cannot find mysql or pgsql extension. You need one or the other: <code><?php echo $req; ?></code></p><?php
+    if (!count(db_types_available())) {
+      ?><p class="error">Cannot find any suitable php database extensions. Laconica supports: <?php echo implode(db_types(), ', '); ?></p><?php
                     $pass = false;
     }
 
