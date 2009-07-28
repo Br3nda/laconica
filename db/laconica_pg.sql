@@ -520,6 +520,28 @@ create table group_alias (
 create index group_alias_group_id_idx on group_alias (group_id);
 
 
+create table session (
+
+    id varchar(32) primary key /* comment 'session ID'*/,
+    session_data text /* comment 'session data'*/,
+    created timestamp not null DEFAULT CURRENT_TIMESTAMP /* comment 'date this record was created'*/,
+    modified integer DEFAULT extract(epoch from CURRENT_TIMESTAMP) /* comment 'date this record was modified'*/ 
+);
+
+create index session_modified_idx on session (modified);
+
+create table deleted_notice (
+
+    id integer primary key /* comment 'identity of notice'*/ ,
+    profile_id integer /* not null comment 'author of the notice'*/,
+    uri varchar(255) unique /* comment 'universally unique identifier, usually a tag URI'*/,
+    created timestamp not null  /* comment 'date the notice record was created'*/ ,
+    deleted timestamp not null DEFAULT CURRENT_TIMESTAMP /* comment 'date the notice record was created'*/
+);
+
+CREATE index deleted_notice_profile_id_idx on deleted_notice (profile_id);
+
+
 /* Textsearch stuff */
 
 create index textsearch_idx on profile using gist(textsearch);
