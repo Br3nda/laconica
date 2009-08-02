@@ -1,7 +1,7 @@
 <?php
 /*
  * Laconica - a distributed open-source microblogging tool
- * Copyright (C) 2008, Controlez-Vous, Inc.
+ * Copyright (C) 2008, 2009, Control Yourself, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-if (!defined('LACONICA')) { exit(1); }
+if (!defined('LACONICA')) {
+    exit(1);
+}
 
 class TwitterapiAction extends Action
 {
@@ -87,7 +89,7 @@ class TwitterapiAction extends Action
 
         $twitter_user['url'] = ($profile->homepage) ? $profile->homepage : null;
         $twitter_user['protected'] = false; # not supported by Laconica yet
-        $twitter_user['followers_count'] = $this->count_subscriptions($profile);
+        $twitter_user['followers_count'] = $profile->subscriberCount();
 
         // To be supported soon...
         $twitter_user['profile_background_color'] = '';
@@ -96,17 +98,11 @@ class TwitterapiAction extends Action
         $twitter_user['profile_sidebar_fill_color'] = '';
         $twitter_user['profile_sidebar_border_color'] = '';
 
-        $subbed = DB_DataObject::factory('subscription');
-        $subbed->subscriber = $profile->id;
-        $subbed_count = (int) $subbed->count() - 1;
-        $twitter_user['friends_count'] = (is_int($subbed_count)) ? $subbed_count : 0;
+        $twitter_user['friends_count'] = $profile->subscriptionCount();
 
         $twitter_user['created_at'] = $this->date_twitter($profile->created);
 
-        $faves = DB_DataObject::factory('fave');
-        $faves->user_id = $user->id;
-        $faves_count = (int) $faves->count();
-        $twitter_user['favourites_count'] = $faves_count; // British spelling!
+        $twitter_user['favourites_count'] = $profile->faveCount(); // British spelling!
 
         // Need to pull up the user for some of this
         $user = User::staticGet($profile->id);
@@ -127,11 +123,7 @@ class TwitterapiAction extends Action
         $twitter_user['profile_background_image_url'] = '';
         $twitter_user['profile_background_tile'] = false;
 
-        $notices = DB_DataObject::factory('notice');
-        $notices->profile_id = $profile->id;
-        $notice_count = (int) $notices->count();
-
-        $twitter_user['statuses_count'] = (is_int($notice_count)) ? $notice_count : 0;
+        $twitter_user['statuses_count'] = $profile->noticeCount();
 
         // Is the requesting user following this user?
         $twitter_user['following'] = false;
@@ -194,6 +186,21 @@ class TwitterapiAction extends Action
             $twitter_status['favorited'] = false;
         }
 
+        # Enclosures
+        $attachments = $notice->attachments();
+        $twitter_status['attachments']=array();
+        if($attachments){
+            foreach($attachments as $attachment){
+                if ($attachment->isEnclosure()) {
+                    $enclosure=array();
+                    $enclosure['url']=$attachment->url;
+                    $enclosure['mimetype']=$attachment->mimetype;
+                    $enclosure['size']=$attachment->size;
+                    $twitter_status['attachments'][]=$enclosure;
+                }
+            }
+        }
+
         if ($include_user) {
             # Don't get notice (recursive!)
             $twitter_user = $this->twitter_user_array($profile, false);
@@ -205,7 +212,6 @@ class TwitterapiAction extends Action
 
     function twitter_rss_entry_array($notice)
     {
-
         $profile = $notice->getProfile();
         $entry = array();
 
@@ -221,6 +227,21 @@ class TwitterapiAction extends Action
 
         $entry['updated'] = $entry['published'];
         $entry['author'] = $profile->getBestName();
+
+        # Enclosure
+        $attachments = $notice->attachments();
+        if($attachments){
+            $entry['enclosures']=array();
+            foreach($attachments as $attachment){
+                if ($attachment->isEnclosure()) {
+                    $enclosure=array();
+                    $enclosure['url']=$attachment->url;
+                    $enclosure['mimetype']=$attachment->mimetype;
+                    $enclosure['size']=$attachment->size;
+                    $entry['enclosures'][]=$enclosure;
+                }
+            }
+        }
 
         # RSS Item specific
         $entry['description'] = $entry['content'];
@@ -276,6 +297,67 @@ class TwitterapiAction extends Action
         return $twitter_dm;
     }
 
+    function twitter_relationship_array($source, $target)
+    {
+        $relationship = array();
+
+        $relationship['source'] =
+            $this->relationship_details_array($source, $target);
+        $relationship['target'] =
+            $this->relationship_details_array($target, $source);
+
+        return array('relationship' => $relationship);
+    }
+
+    function relationship_details_array($source, $target)
+    {
+        $details = array();
+
+        $details['screen_name'] = $source->nickname;
+        $details['followed_by'] = $target->isSubscribed($source);
+        $details['following'] = $source->isSubscribed($target);
+
+        $notifications = false;
+
+        if ($source->isSubscribed($target)) {
+
+            $sub = Subscription::pkeyGet(array('subscriber' =>
+                $source->id, 'subscribed' => $target->id));
+
+            if (!empty($sub)) {
+                $notifications = ($sub->jabber || $sub->sms);
+            }
+        }
+
+        $details['notifications_enabled'] = $notifications;
+        $details['blocking'] = $source->hasBlocked($target);
+        $details['id'] = $source->id;
+
+        return $details;
+    }
+
+    function show_twitter_xml_relationship($relationship)
+    {
+        $this->elementStart('relationship');
+
+        foreach($relationship as $element => $value) {
+            if ($element == 'source' || $element == 'target') {
+                $this->elementStart($element);
+                $this->show_xml_relationship_details($value);
+                $this->elementEnd($element);
+            }
+        }
+
+        $this->elementEnd('relationship');
+    }
+
+    function show_xml_relationship_details($details)
+    {
+        foreach($details as $element => $value) {
+            $this->element($element, null, $value);
+        }
+    }
+
     function show_twitter_xml_status($twitter_status)
     {
         $this->elementStart('status');
@@ -315,6 +397,13 @@ class TwitterapiAction extends Action
         $this->element('pubDate', null, $entry['pubDate']);
         $this->element('guid', null, $entry['guid']);
         $this->element('link', null, $entry['link']);
+
+        # RSS only supports 1 enclosure per item
+        if($entry['enclosures']){
+            $enclosure = $entry['enclosures'][0];
+            $this->element('enclosure', array('url'=>$enclosure['url'],'type'=>$enclosure['mimetype'],'length'=>$enclosure['size']), null);
+        }
+
         $this->elementEnd('item');
     }
 
@@ -521,11 +610,11 @@ class TwitterapiAction extends Action
     function init_document($type='xml')
     {
         switch ($type) {
-         case 'xml':
+        case 'xml':
             header('Content-Type: application/xml; charset=utf-8');
             $this->startXML();
             break;
-         case 'json':
+        case 'json':
             header('Content-Type: application/json; charset=utf-8');
 
             // Check for JSONP callback
@@ -534,16 +623,16 @@ class TwitterapiAction extends Action
                 print $callback . '(';
             }
             break;
-         case 'rss':
+        case 'rss':
             header("Content-Type: application/rss+xml; charset=utf-8");
             $this->init_twitter_rss();
             break;
-         case 'atom':
+        case 'atom':
             header('Content-Type: application/atom+xml; charset=utf-8');
             $this->init_twitter_atom();
             break;
-         default:
-            $this->client_error(_('Not a supported data format.'));
+        default:
+            $this->clientError(_('Not a supported data format.'));
             break;
         }
 
@@ -553,10 +642,10 @@ class TwitterapiAction extends Action
     function end_document($type='xml')
     {
         switch ($type) {
-         case 'xml':
+        case 'xml':
             $this->endXML();
             break;
-         case 'json':
+        case 'json':
 
             // Check for JSONP callback
             $callback = $this->arg('callback');
@@ -564,20 +653,20 @@ class TwitterapiAction extends Action
                 print ')';
             }
             break;
-         case 'rss':
+        case 'rss':
             $this->end_twitter_rss();
             break;
-         case 'atom':
+        case 'atom':
             $this->end_twitter_rss();
             break;
-         default:
-            $this->client_error(_('Not a supported data format.'));
+        default:
+            $this->clientError(_('Not a supported data format.'));
             break;
         }
         return;
     }
 
-    function client_error($msg, $code = 400, $content_type = 'json')
+    function clientError($msg, $code = 400, $content_type = 'json')
     {
 
         static $status = array(400 => 'Bad Request',
@@ -657,14 +746,14 @@ class TwitterapiAction extends Action
     {
         $profile_array = $this->twitter_user_array($profile, true);
         switch ($content_type) {
-         case 'xml':
+        case 'xml':
             $this->show_twitter_xml_user($profile_array);
             break;
-         case 'json':
+        case 'json':
             $this->show_json_objects($profile_array);
             break;
-         default:
-            $this->client_error(_('Not a supported data format.'));
+        default:
+            $this->clientError(_('Not a supported data format.'));
             return;
         }
         return;
@@ -672,8 +761,8 @@ class TwitterapiAction extends Action
 
     function get_user($id, $apidata=null)
     {
-        if (!$id) {
-            
+        if (empty($id)) {
+
             // Twitter supports these other ways of passing the user ID
             if (is_numeric($this->arg('id'))) {
                 return User::staticGet($this->arg('id'));
@@ -681,7 +770,7 @@ class TwitterapiAction extends Action
                 $nickname = common_canonical_nickname($this->arg('id'));
                 return User::staticGet('nickname', $nickname);
             } else if ($this->arg('user_id')) {
-                // This is to ensure that a non-numeric user_id still 
+                // This is to ensure that a non-numeric user_id still
                 // overrides screen_name even if it doesn't get used
                 if (is_numeric($this->arg('user_id'))) {
                     return User::staticGet('id', $this->arg('user_id'));
@@ -693,12 +782,40 @@ class TwitterapiAction extends Action
                 // Fall back to trying the currently authenticated user
                 return $apidata['user'];
             }
-            
+
         } else if (is_numeric($id)) {
             return User::staticGet($id);
         } else {
             $nickname = common_canonical_nickname($id);
             return User::staticGet('nickname', $nickname);
+        }
+    }
+
+    function get_group($id, $apidata=null)
+    {
+        if (empty($id)) {
+
+            if (is_numeric($this->arg('id'))) {
+                return User_group::staticGet($this->arg('id'));
+            } else if ($this->arg('id')) {
+                $nickname = common_canonical_nickname($this->arg('id'));
+                return User_group::staticGet('nickname', $nickname);
+            } else if ($this->arg('group_id')) {
+                // This is to ensure that a non-numeric user_id still
+                // overrides screen_name even if it doesn't get used
+                if (is_numeric($this->arg('group_id'))) {
+                    return User_group::staticGet('id', $this->arg('group_id'));
+                }
+            } else if ($this->arg('group_name')) {
+                $nickname = common_canonical_nickname($this->arg('group_name'));
+                return User_group::staticGet('nickname', $nickname);
+            }
+
+        } else if (is_numeric($id)) {
+            return User_group::staticGet($id);
+        } else {
+            $nickname = common_canonical_nickname($id);
+            return User_group::staticGet('nickname', $nickname);
         }
     }
 
@@ -720,13 +837,13 @@ class TwitterapiAction extends Action
     {
         $source_name = _($source);
         switch ($source) {
-         case 'web':
-         case 'xmpp':
-         case 'mail':
-         case 'omb':
-         case 'api':
+        case 'web':
+        case 'xmpp':
+        case 'mail':
+        case 'omb':
+        case 'api':
             break;
-         default:
+        default:
             $ns = Notice_source::staticGet($source);
             if ($ns) {
                 $source_name = '<a href="' . $ns->url . '">' . $ns->name . '</a>';
@@ -734,6 +851,51 @@ class TwitterapiAction extends Action
             break;
         }
         return $source_name;
+    }
+
+    /**
+     * Returns query argument or default value if not found. Certain
+     * parameters used throughout the API are lightly scrubbed and
+     * bounds checked.  This overrides Action::arg().
+     *
+     * @param string $key requested argument
+     * @param string $def default value to return if $key is not provided
+     *
+     * @return var $var
+     */
+    function arg($key, $def=null)
+    {
+
+        // XXX: Do even more input validation/scrubbing?
+
+        if (array_key_exists($key, $this->args)) {
+            switch($key) {
+            case 'page':
+                $page = (int)$this->args['page'];
+                return ($page < 1) ? 1 : $page;
+            case 'count':
+                $count = (int)$this->args['count'];
+                if ($count < 1) {
+                    return 20;
+                } elseif ($count > 200) {
+                    return 200;
+                } else {
+                    return $count;
+                }
+            case 'since_id':
+                $since_id = (int)$this->args['since_id'];
+                return ($since_id < 1) ? 0 : $since_id;
+            case 'max_id':
+                $max_id = (int)$this->args['max_id'];
+                return ($max_id < 1) ? 0 : $max_id;
+            case 'since':
+                return strtotime($this->args['since']);
+            default:
+                return parent::arg($key, $def);
+            }
+        } else {
+            return $def;
+        }
     }
 
 }

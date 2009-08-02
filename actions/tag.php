@@ -1,7 +1,7 @@
 <?php
 /*
  * Laconica - a distributed open-source microblogging tool
- * Copyright (C) 2008, Controlez-Vous, Inc.
+ * Copyright (C) 2008, 2009, Control Yourself, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -72,13 +72,24 @@ class TagAction extends Action
     function getFeeds()
     {
         return array(new Feed(Feed::RSS1,
-                              common_local_url('tagrss', array('tag' => $this->tag)),
-                              sprintf(_('Feed for tag %s'), $this->tag)));
-    }
-
-    function showPageNotice()
-    {
-        return sprintf(_('Messages tagged "%s", most recent first'), $this->tag);
+                              common_local_url('tagrss',
+                                               array('tag' => $this->tag)),
+                              sprintf(_('Notice feed for tag %s (RSS 1.0)'),
+                                      $this->tag)),
+                     new Feed(Feed::RSS2,   
+                              common_local_url('api',
+                                               array('apiaction' => 'tags',
+                                                     'method' => 'timeline',
+                                                     'argument' => $this->tag.'.rss')),
+                              sprintf(_('Notice feed for %s group (RSS 2.0)'),
+                                      $this->tag)),
+                     new Feed(Feed::ATOM,
+                              common_local_url('api',
+                                               array('apiaction' => 'tags',
+                                                     'method' => 'timeline',
+                                                     'argument' => $this->tag.'.atom')),
+                              sprintf(_('Notice feed for tag %s (Atom)'),
+                                      $this->tag)));
     }
 
     function showContent()

@@ -1,7 +1,7 @@
 <?php
 /*
  * Laconica - a distributed open-source microblogging tool
- * Copyright (C) 2008, Controlez-Vous, Inc.
+ * Copyright (C) 2008, 2009, Control Yourself, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,24 +17,32 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-define('CLAIM_TIMEOUT', 1200);
-
 if (!defined('LACONICA')) { exit(1); }
 
 require_once(INSTALLDIR.'/lib/daemon.php');
 require_once(INSTALLDIR.'/classes/Queue_item.php');
 require_once(INSTALLDIR.'/classes/Notice.php');
 
+define('CLAIM_TIMEOUT', 1200);
+define('QUEUE_HANDLER_MISS_IDLE', 10);
+define('QUEUE_HANDLER_HIT_IDLE', 0);
+
 class QueueHandler extends Daemon
 {
-
     var $_id = 'generic';
 
-    function QueueHandler($id=null)
+    function __construct($id=null, $daemonize=true)
     {
+        parent::__construct($daemonize);
+
         if ($id) {
             $this->set_id($id);
         }
+    }
+
+    function timeout()
+    {
+        return 60;
     }
 
     function class_name()
@@ -80,41 +88,16 @@ class QueueHandler extends Daemon
         if (!$this->start()) {
             return false;
         }
-        $transport = $this->transport();
-        $this->log(LOG_INFO, 'checking for queued notices for "' . $transport . '"');
-        do {
-            $qi = Queue_item::top($transport);
-            if ($qi) {
-                $this->log(LOG_INFO, 'Got item enqueued '.common_exact_date($qi->created));
-                $notice = Notice::staticGet($qi->notice_id);
-                if ($notice) {
-                    $this->log(LOG_INFO, 'broadcasting notice ID = ' . $notice->id);
-                    # XXX: what to do if broadcast fails?
-                    $result = $this->handle_notice($notice);
-                    if (!$result) {
-                        $this->log(LOG_WARNING, 'Failed broadcast for notice ID = ' . $notice->id);
-                        $orig = $qi;
-                        $qi->claimed = null;
-                        $qi->update($orig);
-                        $this->log(LOG_WARNING, 'Abandoned claim for notice ID = ' . $notice->id);
-                        continue;
-                    }
-                    $this->log(LOG_INFO, 'finished broadcasting notice ID = ' . $notice->id);
-                    $notice->free();
-                    unset($notice);
-                    $notice = null;
-                } else {
-                    $this->log(LOG_WARNING, 'queue item for notice that does not exist');
-                }
-                $qi->delete();
-                $qi->free();
-                unset($qi);
-                $this->idle(0);
-            } else {
-                $this->clear_old_claims();
-                $this->idle(5);
-            }
-        } while (true);
+
+        $this->log(LOG_INFO, 'checking for queued notices');
+
+        $queue   = $this->transport();
+        $timeout = $this->timeout();
+
+        $qm = QueueManager::get();
+
+        $qm->service($queue, $this);
+
         if (!$this->finish()) {
             return false;
         }
@@ -123,23 +106,19 @@ class QueueHandler extends Daemon
 
     function idle($timeout=0)
     {
-        if ($timeout>0) {
+        if ($timeout > 0) {
             sleep($timeout);
         }
-    }
-
-    function clear_old_claims()
-    {
-        $qi = new Queue_item();
-        $qi->transport = $this->transport();
-        $qi->whereAdd('now() - claimed > '.CLAIM_TIMEOUT);
-        $qi->update(DB_DATAOBJECT_WHEREADD_ONLY);
-        $qi->free();
-        unset($qi);
     }
 
     function log($level, $msg)
     {
         common_log($level, $this->class_name() . ' ('. $this->get_id() .'): '.$msg);
     }
+
+    function getSockets()
+    {
+        return array();
+    }
 }
+

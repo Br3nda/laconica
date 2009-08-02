@@ -47,10 +47,9 @@ define('MEMBERS_PER_SECTION', 27);
  * @link     http://laconi.ca/
  */
 
-class ShowgroupAction extends Action
+class ShowgroupAction extends GroupDesignAction
 {
-    /** group we're viewing. */
-    var $group = null;
+
     /** page we're viewing. */
     var $page = null;
 
@@ -272,6 +271,17 @@ class ShowgroupAction extends Action
             $this->elementEnd('dl');
         }
 
+        if (common_config('group', 'maxaliases') > 0) {
+            $aliases = $this->group->getAliases();
+
+            if (!empty($aliases)) {
+                $this->elementStart('dl', 'entity_aliases');
+                $this->element('dt', null, _('Aliases'));
+                $this->element('dd', 'aliases', implode(' ', $aliases));
+                $this->elementEnd('dl');
+            }
+        }
+
         $this->elementEnd('div');
 
         $this->elementStart('div', 'entity_actions');
@@ -283,7 +293,7 @@ class ShowgroupAction extends Action
             if ($cur->isMember($this->group)) {
                 $lf = new LeaveForm($this, $this->group);
                 $lf->show();
-            } else {
+            } else if (!Group_block::isBlocked($this->group, $cur->getProfile())) {
                 $jf = new JoinForm($this, $this->group);
                 $jf->show();
             }
@@ -307,8 +317,25 @@ class ShowgroupAction extends Action
           common_local_url('grouprss',
                            array('nickname' => $this->group->nickname));
 
-        return array(new Feed(Feed::RSS1, $url, sprintf(_('Notice feed for %s group'),
-                                                        $this->group->nickname)));
+        return array(new Feed(Feed::RSS1,
+                              common_local_url('grouprss',
+                                               array('nickname' => $this->group->nickname)),
+                              sprintf(_('Notice feed for %s group (RSS 1.0)'),
+                                      $this->group->nickname)),
+                     new Feed(Feed::RSS2,
+                              common_local_url('api',
+                                               array('apiaction' => 'groups',
+                                                     'method' => 'timeline',
+                                                     'argument' => $this->group->nickname.'.rss')),
+                              sprintf(_('Notice feed for %s group (RSS 2.0)'),
+                                      $this->group->nickname)),
+                     new Feed(Feed::ATOM,
+                              common_local_url('api',
+                                               array('apiaction' => 'groups',
+                                                     'method' => 'timeline',
+                                                     'argument' => $this->group->nickname.'.atom')),
+                              sprintf(_('Notice feed for %s group (Atom)'),
+                                      $this->group->nickname)));
     }
 
     /**
@@ -321,6 +348,7 @@ class ShowgroupAction extends Action
     {
         $this->showMembers();
         $this->showStatistics();
+        $this->showAdmins();
         $cloud = new GroupTagCloudSection($this, $this->group);
         $cloud->show();
     }
@@ -344,7 +372,7 @@ class ShowgroupAction extends Action
 
         $this->element('h2', null, _('Members'));
 
-        $pml = new ProfileMiniList($member, null, $this);
+        $pml = new ProfileMiniList($member, $this);
         $cnt = $pml->show();
         if ($cnt == 0) {
              $this->element('p', null, _('(None)'));
@@ -357,6 +385,18 @@ class ShowgroupAction extends Action
         }
 
         $this->elementEnd('div');
+    }
+
+    /**
+     * Show list of admins
+     *
+     * @return void
+     */
+
+    function showAdmins()
+    {
+        $adminSection = new GroupAdminSection($this, $this->group);
+        $adminSection->show();
     }
 
     /**
@@ -411,5 +451,36 @@ class ShowgroupAction extends Action
         $this->elementStart('div', array('id' => 'anon_notice'));
         $this->raw(common_markup_to_html($m));
         $this->elementEnd('div');
+    }
+}
+
+class GroupAdminSection extends ProfileSection
+{
+    var $group;
+
+    function __construct($out, $group)
+    {
+        parent::__construct($out);
+        $this->group = $group;
+    }
+
+    function getProfiles()
+    {
+        return $this->group->getAdmins();
+    }
+
+    function title()
+    {
+        return _('Admins');
+    }
+
+    function divId()
+    {
+        return 'group_admins';
+    }
+
+    function moreUrl()
+    {
+        return null;
     }
 }

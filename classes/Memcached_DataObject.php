@@ -1,7 +1,7 @@
 <?php
 /*
  * Laconica - a distributed open-source microblogging tool
- * Copyright (C) 2008, Controlez-Vous, Inc.
+ * Copyright (C) 2008, 2009, Control Yourself, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -193,7 +193,14 @@ class Memcached_DataObject extends DB_DataObject
                 // unable to connect to sphinx' search daemon
                 if (!$connected) {
                     if ('mysql' === common_config('db', 'type')) {
-                        $search_engine = new MySQLSearch($this, $table);
+                        $type = common_config('search', 'type');
+                        if ($type == 'like') {
+                            $search_engine = new MySQLLikeSearch($this, $table);
+                        } else if ($type == 'fulltext') {
+                            $search_engine = new MySQLSearch($this, $table);
+                        } else {
+                            throw new ServerException('Unknown search type: ' . $type);
+                        }
                     } else {
                         $search_engine = new PGSearch($this, $table);
                     }
@@ -234,21 +241,87 @@ class Memcached_DataObject extends DB_DataObject
     function _connect()
     {
         global $_DB_DATAOBJECT;
-        $exists = !empty($this->_database_dsn_md5) &&
-          isset($_DB_DATAOBJECT['CONNECTIONS'][$this->_database_dsn_md5]);
+
+        $sum = $this->_getDbDsnMD5();
+
+        if (!empty($_DB_DATAOBJECT['CONNECTIONS'][$sum]) &&
+            !PEAR::isError($_DB_DATAOBJECT['CONNECTIONS'][$sum])) {
+            $exists = true;
+        } else {
+            $exists = false;
+       }
+
         $result = parent::_connect();
-        if (!$exists) {
+
+        if ($result && !$exists) {
             $DB = &$_DB_DATAOBJECT['CONNECTIONS'][$this->_database_dsn_md5];
             if (common_config('db', 'type') == 'mysql' &&
                 common_config('db', 'utf8')) {
                 $conn = $DB->connection;
-                if ($DB instanceof DB_mysqli) {
-                    mysqli_set_charset($conn, 'utf8');
-                } else if ($DB instanceof DB_mysql) {
-                    mysql_set_charset('utf8', $conn);
+                if (!empty($conn)) {
+                    if ($DB instanceof DB_mysqli) {
+                        mysqli_set_charset($conn, 'utf8');
+                    } else if ($DB instanceof DB_mysql) {
+                        mysql_set_charset('utf8', $conn);
+                    }
                 }
             }
         }
+
         return $result;
+    }
+
+    // XXX: largely cadged from DB_DataObject
+
+    function _getDbDsnMD5()
+    {
+        if ($this->_database_dsn_md5) {
+            return $this->_database_dsn_md5;
+        }
+
+        $dsn = $this->_getDbDsn();
+
+        if (is_string($dsn)) {
+            $sum = md5($dsn);
+        } else {
+            /// support array based dsn's
+            $sum = md5(serialize($dsn));
+        }
+
+        return $sum;
+    }
+
+    function _getDbDsn()
+    {
+        global $_DB_DATAOBJECT;
+
+        if (empty($_DB_DATAOBJECT['CONFIG'])) {
+            DB_DataObject::_loadConfig();
+        }
+
+        $options = &$_DB_DATAOBJECT['CONFIG'];
+
+        // if the databse dsn dis defined in the object..
+
+        $dsn = isset($this->_database_dsn) ? $this->_database_dsn : null;
+
+        if (!$dsn) {
+
+            if (!$this->_database) {
+                $this->_database = isset($options["table_{$this->__table}"]) ? $options["table_{$this->__table}"] : null;
+            }
+
+            if ($this->_database && !empty($options["database_{$this->_database}"]))  {
+                $dsn = $options["database_{$this->_database}"];
+            } else if (!empty($options['database'])) {
+                $dsn = $options['database'];
+            }
+        }
+
+        if (!$dsn) {
+            throw new Exception("No database name / dsn found anywhere");
+        }
+
+        return $dsn;
     }
 }

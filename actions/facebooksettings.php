@@ -1,7 +1,7 @@
 <?php
 /*
  * Laconica - a distributed open-source microblogging tool
- * Copyright (C) 2008, Controlez-Vous, Inc.
+ * Copyright (C) 2008, 2009, Control Yourself, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -55,7 +55,7 @@ class FacebooksettingsAction extends FacebookAction
         $prefix = $this->trimmed('prefix');
 
         $original = clone($this->flink);
-        $this->flink->set_flags($noticesync, $replysync, false);
+        $this->flink->set_flags($noticesync, $replysync, false, false);
         $result = $this->flink->update($original);
 
         $this->facebook->api_client->data_setUserPreference(FACEBOOK_NOTICE_PREFIX,
@@ -78,7 +78,7 @@ class FacebooksettingsAction extends FacebookAction
             }
         }
 
-        if ($this->facebook->api_client->users_hasAppPermission('status_update')) {
+        if ($this->facebook->api_client->users_hasAppPermission('publish_stream')) {
 
             $this->elementStart('form', array('method' => 'post',
                                                'id' => 'facebook_settings'));
@@ -131,7 +131,7 @@ class FacebooksettingsAction extends FacebookAction
 
             $this->elementStart('ul', array('id' => 'fb-permissions-list'));
             $this->elementStart('li', array('id' => 'fb-permissions-item'));
-            $this->elementStart('fb:prompt-permission', array('perms' => 'status_update',
+            $this->elementStart('fb:prompt-permission', array('perms' => 'publish_stream',
                 'next_fbjs' => 'document.setLocation(\'' . "$this->app_uri/settings.php" . '\')'));
             $this->element('span', array('class' => 'facebook-button'),
                 sprintf(_('Allow %s to update my Facebook status'), common_config('site', 'name')));

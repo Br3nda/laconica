@@ -1,7 +1,7 @@
 <?php
 /*
  * Laconica - a distributed open-source microblogging tool
- * Copyright (C) 2008, Controlez-Vous, Inc.
+ * Copyright (C) 2008, 2009, Control Yourself, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -97,18 +97,11 @@ class StatsCommand extends Command
 {
     function execute($channel)
     {
+        $profile = $this->user->getProfile();
 
-        $subs = new Subscription();
-        $subs->subscriber = $this->user->id;
-        $subs_count = (int) $subs->count() - 1;
-
-        $subbed = new Subscription();
-        $subbed->subscribed = $this->user->id;
-        $subbed_count = (int) $subbed->count() - 1;
-
-        $notices = new Notice();
-        $notices->profile_id = $this->user->id;
-        $notice_count = (int) $notices->count();
+        $subs_count   = $profile->subscriptionCount();
+        $subbed_count = $profile->subscriberCount();
+        $notice_count = $profile->noticeCount();
 
         $channel->output($this->user, sprintf(_("Subscriptions: %1\$s\n".
                                    "Subscribers: %2\$s\n".

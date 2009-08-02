@@ -51,7 +51,7 @@ class PopularNoticeSection extends NoticeSection
         if (common_config('db', 'type') == 'pgsql') {
             $weightexpr='sum(exp(-extract(epoch from (now() - fave.modified)) / %s))';
             if (!empty($this->out->tag)) {
-                $tag = pg_escape_string($this->tag);
+                $tag = pg_escape_string($this->out->tag);
             }
         } else {
             $weightexpr='sum(exp(-(now() - fave.modified) / %s))';
@@ -68,7 +68,7 @@ class PopularNoticeSection extends NoticeSection
         }
         $qry .= ' GROUP BY notice.id,notice.profile_id,notice.content,notice.uri,' .
                 'notice.rendered,notice.url,notice.created,notice.modified,' .
-                'notice.reply_to,notice.is_local,notice.source ' .
+                'notice.reply_to,notice.is_local,notice.source,notice.conversation ' .
                 'ORDER BY weight DESC';
 
         $offset = 0;

@@ -97,7 +97,11 @@ class Rss10Action extends Action
         // Parent handling, including cache check
         parent::handle($args);
         // Get the list of notices
-        $this->notices = $this->getNotices($this->limit);
+        if (empty($this->tag)) {
+            $this->notices = $this->getNotices($this->limit);
+        } else {
+            $this->notices = $this->getTaggedNotices($this->tag, $this->limit);
+        }
         $this->showRss();
     }
 
@@ -166,7 +170,7 @@ class Rss10Action extends Action
         $this->elementStart('rdf:Seq');
 
         foreach ($this->notices as $notice) {
-            $this->element('sioct:MicroblogPost', array('rdf:resource' => $notice->uri));
+            $this->element('rdf:li', array('rdf:resource' => $notice->uri));
         }
 
         $this->elementEnd('rdf:Seq');
@@ -188,21 +192,91 @@ class Rss10Action extends Action
         }
     }
 
+    // XXX: Surely there should be a common function to do this?
+    function extract_tags ($string)
+    {
+        $count = preg_match_all('/(?:^|\s)#([A-Za-z0-9_\-\.]{1,64})/', strtolower($string), $match);
+        if (!count)
+        {
+            return array();
+        }
+
+        $rv = array();
+        foreach ($match[1] as $tag)
+        {
+            $rv[] = common_canonical_tag($tag);
+        } 
+
+        return array_unique($rv);
+    }
+	 
     function showItem($notice)
     {
         $profile = Profile::staticGet($notice->profile_id);
         $nurl = common_local_url('shownotice', array('notice' => $notice->id));
         $creator_uri = common_profile_uri($profile);
-        $this->elementStart('item', array('rdf:about' => $notice->uri));
+        $this->elementStart('item', array('rdf:about' => $notice->uri,
+                            'rdf:type' => 'http://rdfs.org/sioc/types#MicroblogPost'));
         $title = $profile->nickname . ': ' . common_xml_safe_str(trim($notice->content));
         $this->element('title', null, $title);
         $this->element('link', null, $nurl);
         $this->element('description', null, $profile->nickname."'s status on ".common_exact_date($notice->created));
+        if ($notice->rendered) {
+            $this->element('content:encoded', null, common_xml_safe_str($notice->rendered));
+        }
         $this->element('dc:date', null, common_date_w3dtf($notice->created));
         $this->element('dc:creator', null, ($profile->fullname) ? $profile->fullname : $profile->nickname);
-        $this->element('sioc:has_creator', array('rdf:resource' => $creator_uri));
+        $this->element('foaf:maker', array('rdf:resource' => $creator_uri));
+        $this->element('sioc:has_creator', array('rdf:resource' => $creator_uri.'#acct'));
         $this->element('laconica:postIcon', array('rdf:resource' => $profile->avatarUrl()));
         $this->element('cc:licence', array('rdf:resource' => common_config('license', 'url')));
+        if ($notice->reply_to) {
+            $replyurl = common_local_url('shownotice', array('notice' => $notice->reply_to));
+            $this->element('sioc:reply_of', array('rdf:resource' => $replyurl));
+        }
+        $attachments = $notice->attachments();
+        if($attachments){
+            foreach($attachments as $attachment){
+                if ($attachment->isEnclosure()) {
+                    // DO NOT move xmlns declaration to root element. Making it
+                    // the default namespace here improves compatibility with
+                    // real-world feed readers.
+                    $attribs = array(
+                        'rdf:resource' => $attachment->url,
+                        'url' => $attachment->url,
+                        'xmlns' => 'http://purl.oclc.org/net/rss_2.0/enc#'
+                        );
+                    if ($attachment->title) {
+                        $attribs['dc:title'] = $attachment->title;
+                    }
+                    if ($attachment->modified) {
+                        $attribs['dc:date'] = common_date_w3dtf($attachment->modified);
+                    }
+                    if ($attachment->size) {
+                        $attribs['length'] = $attachment->size;
+                    }
+                    if ($attachment->mimetype) {
+                        $attribs['type'] = $attachment->mimetype;
+                    }
+                    $this->element('enclosure', $attribs);
+                }
+                $this->element('sioc:links_to', array('rdf:resource'=>$attachment->url));
+            }
+        }
+        $tags = $this->extract_tags($notice->content);
+        if (!empty($tags)) {
+            foreach ($tags as $tag)
+            {
+                $tagpage = common_local_url('tag', array('tag' => $tag));
+                $tagrss  = common_local_url('tagrss', array('tag' => $tag));
+                $this->elementStart('ctag:tagged');
+                $this->elementStart('ctag:Tag', array('rdf:about'=>$tagpage.'#concept', 'ctag:label'=>$tag));
+                $this->element('foaf:page', array('rdf:resource'=>$tagpage));
+                $this->element('rdfs:seeAlso', array('rdf:resource'=>$tagrss));
+                $this->elementEnd('ctag:Tag');
+                $this->elementEnd('ctag:tagged');
+            }
+        }
         $this->elementEnd('item');
         $this->creators[$creator_uri] = $profile;
     }
@@ -212,15 +286,15 @@ class Rss10Action extends Action
         foreach ($this->creators as $uri => $profile) {
             $id = $profile->id;
             $nickname = $profile->nickname;
-            $this->elementStart('sioc:User', array('rdf:about' => $uri));
+            $this->elementStart('foaf:Agent', array('rdf:about' => $uri));
             $this->element('foaf:nick', null, $nickname);
             if ($profile->fullname) {
                 $this->element('foaf:name', null, $profile->fullname);
             }
-            $this->element('sioc:id', null, $id);
+            $this->element('foaf:holdsAccount', array('rdf:resource' => $uri.'#acct'));
             $avatar = $profile->avatarUrl();
-            $this->element('sioc:avatar', array('rdf:resource' => $avatar));
-            $this->elementEnd('sioc:User');
+            $this->element('foaf:depiction', array('rdf:resource' => $avatar));
+            $this->elementEnd('foaf:Agent');
         }
     }
 
@@ -235,24 +309,28 @@ class Rss10Action extends Action
                                               'xmlns:dc' =>
                                               'http://purl.org/dc/elements/1.1/',
                                               'xmlns:cc' =>
-                                              'http://web.resource.org/cc/',
+                                              'http://creativecommons.org/ns#',
                                               'xmlns:content' =>
                                               'http://purl.org/rss/1.0/modules/content/',
+                                              'xmlns:ctag' =>
+                                              'http://commontag.org/ns#',
                                               'xmlns:foaf' =>
                                               'http://xmlns.com/foaf/0.1/',
                                               'xmlns:sioc' =>
                                               'http://rdfs.org/sioc/ns#',
                                               'xmlns:sioct' =>
                                               'http://rdfs.org/sioc/types#',
+                                              'xmlns:rdfs' =>
+                                              'http://www.w3.org/2000/01/rdf-schema#',
                                               'xmlns:laconica' =>
                                               'http://laconi.ca/ont/',
                                               'xmlns' => 'http://purl.org/rss/1.0/'));
         $this->elementStart('sioc:Site', array('rdf:about' => common_root_url()));
         $this->element('sioc:name', null, common_config('site', 'name'));
-        $this->elementStart('sioc:container_of');
+        $this->elementStart('sioc:space_of');
         $this->element('sioc:Container', array('rdf:about' =>
                                                $channel['url']));
-        $this->elementEnd('sioc:container_of');
+        $this->elementEnd('sioc:space_of');
         $this->elementEnd('sioc:Site');
     }
 
